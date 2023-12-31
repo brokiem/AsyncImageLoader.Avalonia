@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace AsyncImageLoader; 
 
@@ -14,6 +15,12 @@ public static class ImageLoader
 {
     public const string AsyncImageLoaderLogArea = "AsyncImageLoader";
 
+    public static readonly AttachedProperty<int?> WidthProperty =
+            AvaloniaProperty.RegisterAttached<Image, int?>("Width", typeof(ImageLoader));
+    
+    public static readonly AttachedProperty<int?> HeightProperty =
+            AvaloniaProperty.RegisterAttached<Image, int?>("Height", typeof(ImageLoader));
+    
     public static readonly AttachedProperty<string?> SourceProperty =
         AvaloniaProperty.RegisterAttached<Image, string?>("Source", typeof(ImageLoader));
 
@@ -29,8 +36,10 @@ public static class ImageLoader
 
 	private static ConcurrentDictionary<Image, CancellationTokenSource> _pendingOperations = new ConcurrentDictionary<Image, CancellationTokenSource>();
 	private static async void OnSourceChanged(Image sender, AvaloniaPropertyChangedEventArgs args) {
+		var width = GetWidth(sender).GetValueOrDefault(-1);
+		var height = GetHeight(sender).GetValueOrDefault(-1);
 		var url = args.GetNewValue<string?>();
-
+		
 		// Cancel/Add new pending operation
 		CancellationTokenSource? cts = _pendingOperations.AddOrUpdate(sender, new CancellationTokenSource(),
 			(x, y) =>
@@ -56,7 +65,7 @@ public static class ImageLoader
 				// The Bitmap constructor is expensive and cannot be cancelled
 				await Task.Delay(10, cts.Token);
 
-				return await AsyncImageLoader.ProvideImageAsync(url);
+				return await AsyncImageLoader.ProvideImageAsync(url, width, height);
 			}
 			catch (TaskCanceledException)
 			{
@@ -71,6 +80,26 @@ public static class ImageLoader
 		((ICollection<KeyValuePair<Image, CancellationTokenSource>>)_pendingOperations).Remove(new KeyValuePair<Image, CancellationTokenSource>(sender, cts));
 		SetIsLoading(sender, false);
 	}
+    
+    public static int? GetWidth(Image element)
+    {
+        return element.GetValue(WidthProperty);
+    }
+    
+    public static void SetWidth(Image element, int? value)
+    {
+        element.SetValue(WidthProperty, value);
+    }
+    
+    public static int? GetHeight(Image element)
+    {
+        return element.GetValue(HeightProperty);
+    }
+    
+    public static void SetHeight(Image element, int? value)
+    {
+        element.SetValue(HeightProperty, value);
+    }
 
     public static string? GetSource(Image element)
     {

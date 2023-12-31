@@ -11,5 +11,5 @@ public interface IAsyncImageLoader : IDisposable
     /// </summary>
     /// <param name="url">Target url</param>
     /// <returns>Bitmap</returns>
-    public Task<Bitmap?> ProvideImageAsync(string url);
+    public Task<Bitmap?> ProvideImageAsync(string url, int width, int height);
 }

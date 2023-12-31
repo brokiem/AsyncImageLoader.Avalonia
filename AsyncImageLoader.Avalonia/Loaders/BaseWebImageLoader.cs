@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Avalonia.Logging;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Bitmap = Avalonia.Media.Imaging.Bitmap;
 
 namespace AsyncImageLoader.Loaders; 
 
@@ -39,8 +42,8 @@ public class BaseWebImageLoader : IAsyncImageLoader {
     protected HttpClient HttpClient { get; }
 
     /// <inheritdoc />
-    public virtual async Task<Bitmap?> ProvideImageAsync(string url) {
-        return await LoadAsync(url).ConfigureAwait(false);
+    public virtual async Task<Bitmap?> ProvideImageAsync(string url, int width, int height) {
+        return await LoadAsync(url, width, height).ConfigureAwait(false);
     }
 
     public void Dispose() {
@@ -52,8 +55,10 @@ public class BaseWebImageLoader : IAsyncImageLoader {
     ///     Attempts to load bitmap
     /// </summary>
     /// <param name="url">Target url</param>
+    /// <param name="width">Image width</param>
+    /// <param name="height">Image height</param>
     /// <returns>Bitmap</returns>
-    protected virtual async Task<Bitmap?> LoadAsync(string url) {
+    protected virtual async Task<Bitmap?> LoadAsync(string url, int width, int height) {
         var internalOrCachedBitmap =
             await LoadFromLocalAsync(url).ConfigureAwait(false)
          ?? await LoadFromInternalAsync(url).ConfigureAwait(false)
@@ -63,15 +68,46 @@ public class BaseWebImageLoader : IAsyncImageLoader {
         try {
             var externalBytes = await LoadDataFromExternalAsync(url).ConfigureAwait(false);
             if (externalBytes == null) return null;
-
+            
             using var memoryStream = new MemoryStream(externalBytes);
-            var bitmap = new Bitmap(memoryStream);
+            Bitmap bitmap;
+            
+            if (width != -1 && height != -1) {
+                using var image = Image.FromStream(memoryStream);
+                using var sdBitmap = ResizeImage(image, width, height);
+                using var memoryStream2 = new MemoryStream();
+                sdBitmap.Save(memoryStream2, ImageFormat.Png);
+                memoryStream2.Position = 0;
+                bitmap = new Bitmap(memoryStream2);
+            }
+            else {
+                bitmap = new Bitmap(memoryStream);
+            }
+
             await SaveToGlobalCache(url, externalBytes).ConfigureAwait(false);
             return bitmap;
         }
         catch (Exception) {
             return null;
         }
+    }
+
+    private static System.Drawing.Bitmap ResizeImage(Image image, int width, int height) {
+        var destRect = new Rectangle(0, 0, width, height);
+        var bitmap = new System.Drawing.Bitmap(width, height);
+
+        bitmap.SetResolution(image.HorizontalResolution, image.VerticalResolution);
+
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.CompositingMode = CompositingMode.SourceCopy;
+        graphics.CompositingQuality = CompositingQuality.HighQuality;
+        graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
+        graphics.SmoothingMode = SmoothingMode.HighQuality;
+        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+        graphics.DrawImage(image, destRect, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel);
+
+        return bitmap;
     }
 
     /// <summary>
