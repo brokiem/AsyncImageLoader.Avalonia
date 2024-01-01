@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -58,6 +59,7 @@ public class BaseWebImageLoader : IAsyncImageLoader {
     /// <param name="width">Image width</param>
     /// <param name="height">Image height</param>
     /// <returns>Bitmap</returns>
+    [SuppressMessage("Interoperability", "CA1416:Validate platform compatibility")]
     protected virtual async Task<Bitmap?> LoadAsync(string url, int width, int height) {
         var internalOrCachedBitmap =
             await LoadFromLocalAsync(url).ConfigureAwait(false)
@@ -76,7 +78,7 @@ public class BaseWebImageLoader : IAsyncImageLoader {
                 using var image = Image.FromStream(memoryStream);
                 using var sdBitmap = ResizeImage(image, width, height);
                 using var memoryStream2 = new MemoryStream();
-                sdBitmap.Save(memoryStream2, ImageFormat.Png);
+                sdBitmap.Save(memoryStream2, ImageFormat.Webp);
                 memoryStream2.Position = 0;
                 bitmap = new Bitmap(memoryStream2);
             }
