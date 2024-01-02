@@ -66,14 +66,13 @@ public class BaseWebImageLoader : IAsyncImageLoader {
         if (internalOrCachedBitmap != null) return internalOrCachedBitmap;
 
         try {
-            var externalBytes = await LoadDataFromExternalAsync(url).ConfigureAwait(false);
-            if (externalBytes == null) return null;
+            await using var stream = await LoadDataFromExternalAsync(url).ConfigureAwait(false);
+            if (stream == null) return null;
             
-            using var memoryStream = new MemoryStream(externalBytes);
             Bitmap bitmap;
             
             if (width != -1 && height != -1) {
-                using var image = Image.FromStream(memoryStream);
+                using var image = Image.FromStream(stream);
                 using var sdBitmap = ResizeImage(image, width, height);
                 using var memoryStream2 = new MemoryStream();
                 sdBitmap.Save(memoryStream2, ImageFormat.Png);
@@ -81,10 +80,10 @@ public class BaseWebImageLoader : IAsyncImageLoader {
                 bitmap = new Bitmap(memoryStream2);
             }
             else {
-                bitmap = new Bitmap(memoryStream);
+                bitmap = new Bitmap(stream);
             }
 
-            await SaveToGlobalCache(url, externalBytes).ConfigureAwait(false);
+            await SaveToGlobalCache(url, stream).ConfigureAwait(false);
             return bitmap;
         }
         catch (Exception) {
@@ -153,9 +152,9 @@ public class BaseWebImageLoader : IAsyncImageLoader {
     /// </summary>
     /// <param name="url">Target url</param>
     /// <returns>Image bytes</returns>
-    protected virtual async Task<byte[]?> LoadDataFromExternalAsync(string url) {
+    protected virtual async Task<Stream?> LoadDataFromExternalAsync(string url) {
         try {
-            return await HttpClient.GetByteArrayAsync(url).ConfigureAwait(false);
+            return await HttpClient.GetStreamAsync(url).ConfigureAwait(false);
         }
         catch (Exception) {
             return null;
@@ -176,9 +175,9 @@ public class BaseWebImageLoader : IAsyncImageLoader {
     ///     Attempts to load image from global cache (if it is stored before)
     /// </summary>
     /// <param name="url">Target url</param>
-    /// <param name="imageBytes">Bytes to save</param>
+    /// <param name="stream">Stream to save</param>
     /// <returns>Bitmap</returns>
-    protected virtual Task SaveToGlobalCache(string url, byte[] imageBytes) {
+    protected virtual Task SaveToGlobalCache(string url, Stream stream) {
         // Current implementation does not provide global caching
         return Task.CompletedTask;
     }

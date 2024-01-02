@@ -27,29 +27,21 @@ public class DiskCachedWebImageLoader : RamCachedWebImageLoader {
 
     /// <inheritdoc />
     protected override Task<Bitmap?> LoadFromGlobalCache(string url) {
-        var path = Path.Combine(_cacheFolder, CreateMD5(url));
+        var path = Path.Combine(_cacheFolder, CreateMd5(url));
 
         return File.Exists(path) ? Task.FromResult<Bitmap?>(new Bitmap(path)) : Task.FromResult<Bitmap?>(null);
     }
-
-#if NETSTANDARD2_1
-        protected override async Task SaveToGlobalCache(string url, byte[] imageBytes) {
-            var path = Path.Combine(_cacheFolder, CreateMD5(url));
-
-            Directory.CreateDirectory(_cacheFolder);
-            await File.WriteAllBytesAsync(path, imageBytes).ConfigureAwait(false);
-        }
-#else
-    protected override Task SaveToGlobalCache(string url, byte[] imageBytes)
-    {
-        var path = Path.Combine(_cacheFolder, CreateMD5(url));
+    
+    protected override Task SaveToGlobalCache(string url, Stream stream) {
+        var path = Path.Combine(_cacheFolder, CreateMd5(url));
         Directory.CreateDirectory(_cacheFolder);
-        File.WriteAllBytes(path, imageBytes);
+        using(var outputFileStream = new FileStream(path, FileMode.Create)) {
+            stream.CopyTo(outputFileStream);
+        }
         return Task.CompletedTask;
     }
-#endif
 
-    protected static string CreateMD5(string input) {
+    protected static string CreateMd5(string input) {
         // Use input string to calculate MD5 hash
         using var md5 = MD5.Create();
         var inputBytes = Encoding.ASCII.GetBytes(input);
